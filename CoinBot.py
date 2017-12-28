@@ -1,9 +1,18 @@
 #!/usr/bin/env python3
+
 import requests as rq
+import time
 import json
 
 API_URL = 'https://api.telegram.org/bot{}/{}'
 CHATS_PATH = 'chats.txt'
+
+# This bot will save the state of the market to have
+# a reference when comparing to the future values...
+# This reference can be consulted.
+# So the scrape script will only fetch the data to
+# populate the market data which would be given by 
+# the telegram bot.
 
 class TelegramBot:
 
@@ -55,16 +64,22 @@ class TelegramBot:
 
         print('Fetching data...')
         resp = self.get_updates()
+
+        start = time.time()
+
         updates = resp.json()['result']
 
         # Pretty print
         print(json.dumps(updates, indent=2))
 
+        # How much does this takes?
         for msg in updates:
             self._process_update(msg)
 
         if updates:
             self.offset = updates[-1]['update_id'] + 1 
+
+        print(time.time() - start)
 
     def _process_update(self, update):
 
