@@ -4,6 +4,11 @@ import requests as rq
 import time
 import json
 
+import threading
+import queue
+
+import Scraper as sp
+
 API_URL = 'https://api.telegram.org/bot{}/{}'
 CHATS_PATH = 'chats.txt'
 
@@ -19,11 +24,17 @@ class TelegramBot:
     def __init__(self, token, chats=[]):
 
         self.token = token
-        self.chats = []
+        self.chats = set()
 
         self.offset  = 0
         self.timeout = 10
         self.read_latency = 2
+
+        # Threading
+        self.reply_thread = threading.Thread(
+                target=self._reply_message)
+
+        self.updates = queue.Queue()
 
     def get_bot_info(self):
 
@@ -56,6 +67,8 @@ class TelegramBot:
 
     def start_polling(self):
 
+        self.reply_thread.start()
+
         # Long polling strategy
         while True: 
             self._knock_knock()
@@ -74,7 +87,12 @@ class TelegramBot:
 
         # How much does this takes?
         for msg in updates:
-            self._process_update(msg)
+            # Put message in threading queue
+            self.updates.put(msg)
+
+            # It is now multithreading so this
+            # was moved
+            # self._process_update(msg)
 
         if updates:
             self.offset = updates[-1]['update_id'] + 1 
@@ -93,14 +111,16 @@ class TelegramBot:
 
         msg = update['message']
 
-        if msg['text'] != '/start': 
-            return 
+        if msg['text'] == '/start': 
+            reply = _prepare_notify_request(msg)
+
+        if msg['text'] == '/market':
+            reply = _reply_market_info(msg)
         
-        reply = _prepare_notify_request(msg)
         resp = self.send_message(reply)
 
-        parsed = resp.json()
-        print(json.dumps(parsed, indent=2))
+        # parsed = resp.json()
+        # print(json.dumps(parsed, indent=2))
 
     def _process_callback_query(self, update):
 
@@ -119,6 +139,7 @@ class TelegramBot:
 
         self.send_message(reply)
 
+        # To remove reply markup
         # reply['message_id'] = message['message_id']
         # self.edit_message_reply_markup(reply)
 
@@ -131,15 +152,29 @@ class TelegramBot:
     def store_chat(self, chat_id):
 
         chat = str(chat_id)
-        self.chats.append(chat)
+        self.chats.add(chat)
 
     def forget_chat(self, chat_id):
 
         chat = str(chat_id)
-        try:
-            self.chats.remove(chat)
-        except ValueError:
-            pass
+        self.chats.discard(chat)
+    
+    def _reply_message(self):
+
+        while True:
+            msg = self.updates.get()
+            if msg is None:
+                break
+
+            self._process_update(msg)
+            self.updates.task_done()
+
+    def end_polling(self):
+
+        self.updates.join()
+        self.updates.put(None)
+        self.reply_thread.join()
+
 
 # Utils
 def read_stored_chats():
@@ -165,6 +200,23 @@ def _prepare_notify_request(msg):
 
     return dat
 
+def _reply_market_info(msg):
+    
+    try:
+        market = sp.get_global_market()
+        text = 'BitCoin Price: ${:.2f}\nTotal Market Cap:\n${:.2f}...'
+        text = text.format(market['btcPrice'], market['totalCap'])
+        # I should make a class to store the market info
+    except Exception as e:
+        print(e)
+        reply = 'Ups... There was an error.'
+
+    dat = {}
+    dat['chat_id'] = msg['chat']['id']
+    dat['text'] = text
+
+    return dat
+
 if __name__ == '__main__':
 
     # Enter some token from input
@@ -181,5 +233,6 @@ if __name__ == '__main__':
         pass
 
     finally:
+        bot.end_polling()
         write_stored_chats(bot.chats)
     
