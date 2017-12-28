@@ -3,67 +3,141 @@ import requests as rq
 import json
 
 API_URL = 'https://api.telegram.org/bot{}/{}'
+CHATS_PATH = 'chats.txt'
 
-def get_bot_info(token):
-    url = API_URL.format(token, 'getMe')
-    res = rq.get(url)
-    return res
+class TelegramBot:
 
-def get_updates(token, offset=0, timeout=10):
-    url = API_URL.format(token, 'getUpdates')
-    dat = { 'offset': offset, 'timeout': timeout }
+    def __init__(self, token, chats=[]):
 
-    # Timeout + read_latency
-    resp = rq.post(url, data=dat, timeout=timeout+2)
-    return resp
+        self.token = token
+        self.chats = []
 
-def long_poll(token):
-    offset = 0
-    timeout = 10
+        self.offset  = 0
+        self.timeout = 10
+        self.read_latency = 2
 
-    while True: 
+    def get_bot_info(self):
+
+        url = API_URL.format(self.token, 'getMe')
+        res = rq.get(url)
+        return res
+
+    def get_updates(self, offset=None, timeout=None):
+
+        if not offset:
+            offset = self.offset
+
+        if not timeout:
+            timeout = self.timeout
+
+        url = API_URL.format(self.token, 'getUpdates')
+        dat = { 'offset': offset, 'timeout': timeout }
+
+        # Timeout + read_latency
+        resp = rq.post(url, data=dat, 
+                timeout=timeout+self.read_latency)
+
+        return resp
+
+    def send_message(self, msg):
+
+        url = API_URL.format(self.token, 'sendMessage')
+        res = rq.post(url, data=msg) # Send invitation
+        return res
+
+    def start_polling(self):
+
+        # Long polling strategy
+        while True: 
+            self._knock_knock()
+
+    def _knock_knock(self):
+
         print('Fetching data...')
-        resp = get_updates(token, offset, timeout)
+        resp = self.get_updates()
         updates = resp.json()['result']
 
         # Pretty print
         print(json.dumps(updates, indent=2))
 
         for msg in updates:
-            process_update(token, msg)
+            self._process_update(msg)
 
         if updates:
-            offset = updates[-1]['update_id'] + 1 
+            self.offset = updates[-1]['update_id'] + 1 
 
-def process_update(token, update):
-    if 'message' in update:
-        process_message(token, update)
+    def _process_update(self, update):
 
-    elif 'callback_query' in update:
-        process_callback_query(token, update)
+        if 'message' in update:
+            self._process_message(update)
 
-def process_message(token, update):
-    msg = update['message']
+        elif 'callback_query' in update:
+            self._process_callback_query(update)
 
-    if msg['text'] != '/start':
-        return False
-    
-    url = API_URL.format(token, 'sendMessage')
-    dat = prepare_notify_request(msg)
-    res = rq.post(url, data=dat) # Send invitation
+    def _process_message(self, update):
 
-    parsed = res.json()
-    print(json.dumps(parsed, indent=2))
+        msg = update['message']
 
-def process_callback_query(token, update):
-    query = update['callback_query']
+        if msg['text'] != '/start': 
+            return 
+        
+        reply = _prepare_notify_request(msg)
+        resp = self.send_message(reply)
 
-    if query['data'] == 'True':
-        print('Stored chat in txt') # Store chat in txt
-    else:
-        print('Bad boy')
+        parsed = resp.json()
+        print(json.dumps(parsed, indent=2))
 
-def prepare_notify_request(msg):
+    def _process_callback_query(self, update):
+
+        query = update['callback_query']
+        message = query['message']
+
+        reply = {}
+        reply['chat_id'] = message['chat']['id']
+
+        if query['data'] == 'True':
+            self.store_chat(reply['chat_id'])
+            reply['text'] = 'Now you will receive news about Jesus.' 
+        else:
+            self.forget_chat(reply['chat_id'])
+            reply['text'] = 'Now Jesus will forget you.'
+
+        self.send_message(reply)
+
+        # reply['message_id'] = message['message_id']
+        # self.edit_message_reply_markup(reply)
+
+    def edit_message_reply_markup(self, msg):
+
+        url = API_URL.format(self.token, 'editMessageReplyMarkup')
+        res = rq.post(url, data=msg)
+        return res
+
+    def store_chat(self, chat_id):
+
+        chat = str(chat_id)
+        self.chats.append(chat)
+
+    def forget_chat(self, chat_id):
+
+        chat = str(chat_id)
+        try:
+            self.chats.remove(chat)
+        except ValueError:
+            pass
+
+# Utils
+def read_stored_chats():
+    with open(CHATS_PATH, 'w+') as f:
+        chats = f.read().splitlines()
+    return chats
+
+def write_stored_chats(chats):
+    with open(CHATS_PATH, 'w') as f:
+        f.writelines(chats)
+
+# Prepare notify invitation
+def _prepare_notify_request(msg):
     dat = {}
     dat['chat_id'] = msg['chat']['id'] 
     dat['text'] = 'Would you like to receive news about Jesus?' 
@@ -77,12 +151,20 @@ def prepare_notify_request(msg):
     return dat
 
 if __name__ == '__main__':
+
     # Enter some token from input
     token = input()
     print('Token entered:', token)
 
-    try:
-        long_poll(token)
-    except BaseException as e:
-        print(e)
+    chats = read_stored_chats()
 
+    try:
+        bot = TelegramBot(token, chats)
+        bot.start_polling()
+
+    except KeyboardInterrupt:
+        pass
+
+    finally:
+        write_stored_chats(bot.chats)
+    
