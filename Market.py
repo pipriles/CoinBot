@@ -49,7 +49,7 @@ class MarketInfo:
         print('Changed: {:+.2f}'.format(diff))
         print('24h change: {:+.2f}'.format(percent_change))
 
-        if abs(diff) > 1:
+        if abs(diff) > 10000000000:
             print('changed by 10b!')
             return True
 

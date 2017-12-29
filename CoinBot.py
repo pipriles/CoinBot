@@ -3,6 +3,7 @@
 import requests as rq
 import time
 import json
+import re
 
 import threading
 import queue
@@ -35,6 +36,8 @@ class TelegramBot:
         # Should be moved to other site
         if market is None:
             self.market = mkt.MarketInfo()
+
+        self.expected = {}
 
         # Threading
         # Uncomment for multithreading
@@ -191,19 +194,31 @@ class TelegramBot:
     def _process_message(self, update):
 
         msg = update['message']
+
+        if 'text' not in msg \
+        or 'from' not in msg:
+            return
+
         text = msg['text']
 
-        if text == '/start': 
+        if re.fullmatch(r'/start(@\w+)?', text):
             resp = self._ask_for_nudes(msg)
 
-        elif text == '/market':
+        elif re.fullmatch(r'/market(@\w+)?', text):
             resp = self._reply_market_info(msg)
 
-        elif text == '/jellybeans':
+        elif re.fullmatch(r'/jellybeans(@\w+)?', text):
             resp = self._tell_bad_joke(msg)
 
-        elif text == '/admin':
+        # Both these expect a user response
+        elif re.fullmatch(r'/admin(@\w+)?', text):
             resp = self._ask_for_secret(msg)
+
+        elif re.fullmatch(r'/broadcast(@\w+)?', text):
+            self._expect_broadcast(msg)
+
+        else:
+            self._check_broadcast_reply(msg)
         
         # parsed = resp.json()
         # print(json.dumps(parsed, indent=2))
@@ -226,6 +241,30 @@ class TelegramBot:
 
         self.answer_callback_query(reply)
         # self.send_message(reply)
+
+    def _check_broadcast_reply(self, msg):
+
+        chat = msg['chat']['id']
+        user = msg['from']['id']
+
+        if chat not in self.expected:
+            return
+        
+        if user != self.expected[chat]:
+            return
+
+        # Validate if user is admin
+        reply = { 'text': msg['text'] }
+        self.broadcast(reply)
+
+        del self.expected[chat]
+
+    def _expect_broadcast(self, msg):
+
+        user = msg['from']['id']
+        chat = msg['chat']['id']
+
+        self.expected[user] = chat
 
     def _ask_for_secret(self, msg):
         print(json.dumps(msg, indent=2))
