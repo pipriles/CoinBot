@@ -265,6 +265,10 @@ class TelegramBot:
         chat = msg['chat']['id']
 
         self.expected[user] = chat
+        self.send_message({ 
+            'chat_id': chat, 
+            'text': 'What would you like to say to everyone?' 
+        })
 
     def _ask_for_secret(self, msg):
         print(json.dumps(msg, indent=2))
