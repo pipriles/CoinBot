@@ -3,7 +3,7 @@
 CHATS_PATH = 'chats.txt'
 
 def read_stored_chats():
-    with open(CHATS_PATH, 'r') as f:
+    with open(CHATS_PATH, 'w+') as f:
         chats = f.read().splitlines()
     return chats
 
