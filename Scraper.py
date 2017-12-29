@@ -1,93 +1,64 @@
 #!/usr/bin/env python3
-import requests as rq
-import time
+import threading
 import json
 
-# Coin market cap
-# API_URL = 'https://api.coinmarketcap.com/v1/{}/'
-API_URL = 'http://coincap.io/global'
+import Market as mkt
 
-def request_global_market():
-    url = API_URL.format('global')
-    res = rq.get(url, timeout=30)
-    return res
+class MarketScraper(threading.Thread):
 
-def request_all_coins():
-    url = API_URL.format('ticker')
-    res = rq.get(url, timeout=30)
-    return res
+    def __init__(self, bot, timeout=30):
 
-class MarketScraper:
+        threading.Thread.__init__(self)
 
-    def __init__(self):
+        self.event = threading.Event()
+        self.bot = bot
+        self.timeout = timeout
 
-        self.ref_market = None
-        self.new_market = None
-
-    def scrape_global_market(self, timeout=30):
+    def run(self):
 
         attempt = 1
         delay = 60
 
-        while True:
+        while not self.event.is_set():
 
             try:
-                self.new_market = get_global_market()
-
-                if self.new_market is None:
-                    raise Exception('The global market was None')
-
-                ref_market = self.compare_market()
-
-                print(json.dumps(self.ref_market, indent=2))
-                print(json.dumps(self.new_market, indent=2))
-
-                time.sleep(timeout)
+                fetch_market_changes(self.bot)
+                self.event.wait(self.timeout)
                 delay = 60
 
             except Exception as e:
-                print(e)
+                raise e
                 if attempt > 3:
                     break
 
-                time.sleep(delay)
+                self.event.wait(delay)
                 attempt += 1
                 delay *= 2
 
+            # This is not needed...
             except KeyboardInterrupt:
                 break
 
-    # Returns which will be the next reference
-    # to the other comparisons
-    def compare_market(self):
+def fetch_market_changes(bot):
 
-        if self.ref_market is None:
-            return self.new_market
+    bot.market.current = mkt.get_global_market()
 
-        # oldcap = old['total_market_cap_usd']
-        # newcap = new['total_market_cap_usd']
-        oldcap = self.ref_market['totalCap']
-        newcap = self.new_market['totalCap']
+    if bot.market.current is None:
+        raise Exception('The current global market was None')
 
-        diff = newcap - oldcap
-        percent_change = diff / oldcap
+    if bot.market.reference is None:
+        bot.market.reference = bot.market.current
 
-        print('Changed: {:+f}'.format(diff))
-        print('24h Change: {:+.2f}'.format(percent_change))
+    result = bot.market.compare_market()
 
-        if abs(diff) > 10000000000:
-            print('Changed by 10B!')
-            return new_market
+    # print(json.dumps(bot.market.reference, indent=2))
+    # print(json.dumps(bot.market.current, indent=2))
 
-        return ref_market
-
-def get_global_market():
-
-    market = None
-    resp = request_global_market()
-
-    if resp.status_code == 200:
-        market = resp.json()
-
-    return market
+    if result:
+        # Notify change to coin bot
+        # I don't like how this looks...
+        print('News About Jesus!', bot.chats)
+        msg = { 'text': bot.market.market_change_text() }
+        bot.broadcast(msg)
+        bot.market.reference = bot.market.current
 

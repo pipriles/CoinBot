@@ -8,9 +8,11 @@ import threading
 import queue
 
 import Scraper as sp
+import Market as mkt
+import Utils as utils
 
 API_URL = 'https://api.telegram.org/bot{}/{}'
-CHATS_PATH = 'chats.txt'
+JOKE_API = 'https://icanhazdadjoke.com/'
 
 # This bot will save the state of the market to have
 # a reference when comparing to the future values...
@@ -21,20 +23,25 @@ CHATS_PATH = 'chats.txt'
 
 class TelegramBot:
 
-    def __init__(self, token, chats=[]):
+    def __init__(self, token, chats=None, market=None):
 
         self.token = token
-        self.chats = set()
+        self.chats = set() if chats is None else set(chats)
 
         self.offset  = 0
         self.timeout = 10
         self.read_latency = 2
 
-        # Threading
-        self.reply_thread = threading.Thread(
-                target=self._reply_message)
+        # Should be moved to other site
+        if market is None:
+            self.market = mkt.MarketInfo()
 
-        self.updates = queue.Queue()
+        # Threading
+        # Uncomment for multithreading
+        # self.reply_thread = threading.Thread(
+        #         target=self._reply_message)
+
+        # self.updates = queue.Queue()
 
     def get_bot_info(self):
 
@@ -57,6 +64,9 @@ class TelegramBot:
         resp = rq.post(url, data=dat, 
                 timeout=timeout+self.read_latency)
 
+        if resp.status_code != 200:
+            resp = { 'result': [] }
+
         return resp
 
     def send_message(self, msg):
@@ -67,86 +77,60 @@ class TelegramBot:
 
     def start_polling(self):
 
-        self.reply_thread.start()
+        # Uncomment for multithreading
+        # self.reply_thread.start()
 
-        # Long polling strategy
         while True: 
-            self._knock_knock()
+            # Long polling strategy
+            try:
+                self._knock_knock()
+
+            except rq.ReadTimeout:
+                time.sleep(10)
+
+        # Add for multithreading
+        # finally:
+        #     self.end_polling()
 
     def _knock_knock(self):
 
+        updates = []
         print('Fetching data...')
-        resp = self.get_updates()
+
+        try:
+            resp = self.get_updates()
+            updates = resp.json()['result']
+        except Exception as e:
+            raise e
+            time.sleep(30)
 
         start = time.time()
-
-        updates = resp.json()['result']
-
-        # Pretty print
-        print(json.dumps(updates, indent=2))
 
         # How much does this takes?
         for msg in updates:
             # Put message in threading queue
-            self.updates.put(msg)
+            # Uncomment for multithreading
+            # self.updates.put(msg)
 
             # It is now multithreading so this
             # was moved
-            # self._process_update(msg)
+            self._process_update(msg)
 
         if updates:
             self.offset = updates[-1]['update_id'] + 1 
 
         print(time.time() - start)
 
-    def _process_update(self, update):
-
-        if 'message' in update:
-            self._process_message(update)
-
-        elif 'callback_query' in update:
-            self._process_callback_query(update)
-
-    def _process_message(self, update):
-
-        msg = update['message']
-
-        if msg['text'] == '/start': 
-            reply = _prepare_notify_request(msg)
-
-        if msg['text'] == '/market':
-            reply = _reply_market_info(msg)
-        
-        resp = self.send_message(reply)
-
-        # parsed = resp.json()
-        # print(json.dumps(parsed, indent=2))
-
-    def _process_callback_query(self, update):
-
-        query = update['callback_query']
-        message = query['message']
-
-        reply = {}
-        reply['chat_id'] = message['chat']['id']
-
-        if query['data'] == 'True':
-            self.store_chat(reply['chat_id'])
-            reply['text'] = 'Now you will receive news about Jesus.' 
-        else:
-            self.forget_chat(reply['chat_id'])
-            reply['text'] = 'Now Jesus will forget you.'
-
-        self.send_message(reply)
-
-        # To remove reply markup
-        # reply['message_id'] = message['message_id']
-        # self.edit_message_reply_markup(reply)
-
     def edit_message_reply_markup(self, msg):
 
         url = API_URL.format(self.token, 'editMessageReplyMarkup')
         res = rq.post(url, data=msg)
+        return res
+
+    def answer_callback_query(self, args):
+
+        url = API_URL.format(self.token, 'answerCallbackQuery')
+        res = rq.post(url, data=args)
         return res
 
     def store_chat(self, chat_id):
@@ -158,7 +142,19 @@ class TelegramBot:
 
         chat = str(chat_id)
         self.chats.discard(chat)
-    
+
+    def broadcast(self, message):
+
+        for chat in self.chats:
+            result = { 'chat_id': chat }
+            result.update(message)
+            self.send_message(result)
+
+    ##############################
+    # Just for multithreading    #
+    # This is not useful for now #
+    ##############################
+
     def _reply_message(self):
 
         while True:
@@ -169,6 +165,7 @@ class TelegramBot:
             self._process_update(msg)
             self.updates.task_done()
 
+    # Just for multithreading
     def end_polling(self):
 
         self.updates.join()
@@ -176,63 +173,143 @@ class TelegramBot:
         self.reply_thread.join()
 
 
-# Utils
-def read_stored_chats():
-    with open(CHATS_PATH, 'w+') as f:
-        chats = f.read().splitlines()
-    return chats
+    ##################################
+    # From here can be another class #
+    # for better scalability         #
+    ##################################
 
-def write_stored_chats(chats):
-    with open(CHATS_PATH, 'w') as f:
-        f.writelines(chats)
+    def _process_update(self, update):
 
-# Prepare notify invitation
-def _prepare_notify_request(msg):
-    dat = {}
-    dat['chat_id'] = msg['chat']['id'] 
-    dat['text'] = 'Would you like to receive news about Jesus?' 
-    dat['reply_markup'] = json.dumps({ 
-        'inline_keyboard': [[
-            { 'text': 'Yep' , 'callback_data': 'True' }, 
-            { 'text': 'Nope', 'callback_data': 'False' }
-        ]]
-    })
+        print(json.dumps(update, indent=2))
 
-    return dat
+        if 'message' in update:
+            self._process_message(update)
 
-def _reply_market_info(msg):
-    
+        elif 'callback_query' in update:
+            self._process_callback_query(update)
+
+    def _process_message(self, update):
+
+        msg = update['message']
+        text = msg['text']
+
+        if text == '/start': 
+            resp = self._ask_for_nudes(msg)
+
+        elif text == '/market':
+            resp = self._reply_market_info(msg)
+
+        elif text == '/jellybeans':
+            resp = self._tell_bad_joke(msg)
+
+        elif text == '/admin':
+            resp = self._ask_for_secret(msg)
+        
+        # parsed = resp.json()
+        # print(json.dumps(parsed, indent=2))
+
+    def _process_callback_query(self, update):
+
+        query = update['callback_query']
+        message = query['message']
+
+        reply = { 'callback_query_id': query['id'] }
+        chat_id = message['chat']['id']
+
+        if query['data'] == 'True':
+            self.store_chat(chat_id)
+            reply['text'] = 'Now you will receive news about Jesus.' 
+            
+        else:
+            self.forget_chat(chat_id)
+            reply['text'] = 'Now Jesus will forget you.'
+
+        self.answer_callback_query(reply)
+        # self.send_message(reply)
+
+    def _ask_for_secret(self, msg):
+        print(json.dumps(msg, indent=2))
+
+    def _ask_for_nudes(self, msg):
+
+        reply = {}
+        reply['chat_id'] = msg['chat']['id'] 
+        reply['text'] = 'Would you like to receive news about Jesus?' 
+        reply['reply_markup'] = json.dumps({ 
+            'inline_keyboard': [[
+                { 'text': 'Yep' , 'callback_data': 'True' }, 
+                { 'text': 'Nope', 'callback_data': 'False' }
+            ]]
+        })
+
+
+        return self.send_message(reply)
+
+    def _reply_market_info(self, msg):
+        
+        try:
+            market = mkt.get_global_market()
+            text = 'BitCoin Price: ${:.2f}\n'
+            text += 'Total Market Cap:\n${:.2f}...'
+            text = text.format(market['btcPrice'], market['totalCap'])
+            # I should make a class to store the market info
+        except Exception as e:
+            print(e)
+            text = 'Ups... There was an error.'
+
+        reply = {}
+        reply['chat_id'] = msg['chat']['id']
+        reply['text'] = text
+
+        return self.send_message(reply)
+
+    def _tell_bad_joke(self, msg):
+
+        reply = { 'chat_id': msg['chat']['id'] }
+
+        try:
+            headers = { 'Accept': 'application/json' }
+            resp = rq.get(JOKE_API, headers=headers)
+            parsed = resp.json()
+            reply['text'] = parsed['joke']
+
+        except Exception as e:
+            print(e)
+            reply['text'] = 'Ups...'
+
+        return self.send_message(reply)
+
+def bot_factory():
+
+    token = utils.input_token()
+    chats = utils.read_stored_chats()
+    bot = TelegramBot(token, chats)
+    return bot
+
+def main():
+
+    bot = None
+    scraper = None
+
     try:
-        market = sp.get_global_market()
-        text = 'BitCoin Price: ${:.2f}\nTotal Market Cap:\n${:.2f}...'
-        text = text.format(market['btcPrice'], market['totalCap'])
-        # I should make a class to store the market info
-    except Exception as e:
-        print(e)
-        reply = 'Ups... There was an error.'
+        # Initiate telegram bot and scraper thread
+        bot = bot_factory()
+        scraper = sp.MarketScraper(bot)
 
-    dat = {}
-    dat['chat_id'] = msg['chat']['id']
-    dat['text'] = text
-
-    return dat
-
-if __name__ == '__main__':
-
-    # Enter some token from input
-    token = input()
-    print('Token entered:', token)
-
-    chats = read_stored_chats()
-
-    try:
-        bot = TelegramBot(token, chats)
+        # Start scraper and bot
+        scraper.start()
         bot.start_polling()
 
     except KeyboardInterrupt:
         pass
 
     finally:
-        bot.end_polling()
-        write_stored_chats(bot.chats)
-    
+        utils.write_stored_chats(bot.chats)
+        if scraper:
+            # End thread
+            scraper.event.set()
+            scraper.join()
+
+if __name__ == '__main__':
+    main()
+
