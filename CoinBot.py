@@ -37,7 +37,7 @@ class TelegramBot:
 
         # Should be moved to other site
         if market is None:
-            self.market = mkt.MarketInfo()
+            self.market = mkt.MarketChange()
 
         self._broadcasters = {}
         self._peasants = {}
@@ -92,7 +92,8 @@ class TelegramBot:
                 self._knock_knock()
 
             # except rq.ReadTimeout:
-            except Exception:
+            except Exception as e:
+                print(e)
                 time.sleep(10)
 
         # Add for multithreading
@@ -104,12 +105,8 @@ class TelegramBot:
         updates = []
         print('Fetching data...')
 
-        try:
-            resp = self.get_updates()
-            updates = resp.json()['result']
-        except Exception as e:
-            raise e
-            time.sleep(30)
+        resp = self.get_updates()
+        updates = resp.json()['result']
 
         start = time.time()
 
@@ -352,10 +349,16 @@ class TelegramBot:
         
         try:
             market = mkt.get_global_market()
-            text = 'BitCoin Price: ${:.2f}\n'
+            coin = mkt.get_bitcoin_info()
+
+            text  = 'BitCoin Price: ${:.2f}\n'
             text += 'Total Market Cap:\n${:.2f}...'
-            text = text.format(market['btcPrice'], market['totalCap'])
-            # I should make a class to store the market info
+
+            text = text.format(
+                float(coin['price_usd']), 
+                float(market['total_market_cap_usd'])
+            )
+
         except Exception as e:
             print(e)
             text = 'Ups... There was an error.'

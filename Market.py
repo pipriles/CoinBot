@@ -2,19 +2,25 @@
 import requests as rq
 
 # Coin market cap
-# API_URL = 'https://api.coinmarketcap.com/v1/{}/'
+API_URL = 'https://api.coinmarketcap.com/v1/{}/'
+MARKET_CAP = 'total_market_cap_usd'
 
-API_URL = 'http://coincap.io/global'
-MARKET_CAP = 'totalCap'
+# API_URL = 'http://coincap.io/global'
 
 def request_global_market():
+
     url = API_URL.format('global')
-    res = rq.get(url, timeout=30)
+    res = rq.get(url, timeout=3)
     return res
 
-def request_all_coins():
+def request_coin(ticker=None):
+
     url = API_URL.format('ticker')
-    res = rq.get(url, timeout=30)
+    if ticker:
+        url += '{}/'
+        url  = url.format(ticker)
+
+    res = rq.get(url, timeout=3)
     return res
 
 def get_global_market():
@@ -27,7 +33,30 @@ def get_global_market():
 
     return market
 
-class MarketInfo:
+def get_bitcoin_info():
+
+    info = None
+    resp = request_coin('bitcoin')
+
+    if resp.status_code == 200:
+
+        coins = resp.json()
+
+        if not coins:
+            return None
+
+        info = coins[0]
+
+        # Add change data
+        current_market_cap = float(info['market_cap_usd'])
+        percent_change = float(info['percent_change_24h'])
+
+        old_market_cap = current_market_cap / (percent_change + 1)
+        info['change_24h'] = current_market_cap - old_market_cap
+    
+    return info
+
+class MarketChange:
 
     def __init__(self):
 
@@ -40,11 +69,11 @@ class MarketInfo:
         if self.reference is None:
             return False
 
-        oldcap = self.reference[MARKET_CAP]
-        newcap = self.current[MARKET_CAP]
+        old_cap = float(self.reference[MARKET_CAP])
+        new_cap = float(self.current[MARKET_CAP])
 
-        diff = newcap - oldcap
-        percent_change = diff / oldcap
+        diff = new_cap - old_cap
+        percent_change = diff / old_cap
 
         print('Changed: {:+.2f}'.format(diff))
         print('24h change: {:+.2f}'.format(percent_change))
@@ -55,17 +84,16 @@ class MarketInfo:
 
         return False
 
-    def market_change_text(self):
+    def calculate_change(self):
 
-        oldcap = self.reference[MARKET_CAP]
-        newcap = self.current[MARKET_CAP]
+        old_cap = float(self.reference[MARKET_CAP])
+        new_cap = float(self.current[MARKET_CAP])
 
-        diff = newcap - oldcap
-        percent_change = diff / oldcap
+        diff = new_cap - old_cap
+        percent_change = diff / old_cap
 
-        text  = 'Total Market Cap:\n'
-        text += 'Change: {:+.2f}\n'.format(diff)
-        text += '24h Change: {:+.2f}%'.format(percent_change)
-
-        return text
+        return {
+            'market_cap_change': diff,
+            'percent_change_24h': percent_change
+        }
 
