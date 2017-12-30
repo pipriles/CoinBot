@@ -288,7 +288,8 @@ class TelegramBot:
         if user != self._peasants[chat]:
             return
 
-        if msg['text'] == 'Yes':
+        # Validate if it is not str
+        if msg['text'].lower() == 'yes':
             self.add_admin(user)
             reply = 'Now you are part of Jesus'
         else:
