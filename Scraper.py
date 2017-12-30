@@ -27,7 +27,7 @@ class MarketScraper(threading.Thread):
                 delay = 60
 
             except Exception as e:
-                raise e
+                print(e)
                 if attempt > 3:
                     break
 

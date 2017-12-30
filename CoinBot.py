@@ -24,10 +24,12 @@ JOKE_API = 'https://icanhazdadjoke.com/'
 
 class TelegramBot:
 
-    def __init__(self, token, chats=None, market=None):
+    def __init__(self, token, 
+            chats=None, admins=None, market=None):
 
         self.token = token
         self.chats = set() if chats is None else set(chats)
+        self.admins = set() if admins is None else set(admins)
 
         self.offset  = 0
         self.timeout = 10
@@ -37,7 +39,8 @@ class TelegramBot:
         if market is None:
             self.market = mkt.MarketInfo()
 
-        self.expected = {}
+        self._broadcasters = {}
+        self._peasants = {}
 
         # Threading
         # Uncomment for multithreading
@@ -88,7 +91,8 @@ class TelegramBot:
             try:
                 self._knock_knock()
 
-            except rq.ReadTimeout:
+            # except rq.ReadTimeout:
+            except Exception:
                 time.sleep(10)
 
         # Add for multithreading
@@ -146,6 +150,11 @@ class TelegramBot:
         chat = str(chat_id)
         self.chats.discard(chat)
 
+    def add_admin(self, user_id):
+
+        user_id = str(user_id)
+        self.admins.add(user_id)
+
     def broadcast(self, message):
 
         for chat in self.chats:
@@ -194,6 +203,7 @@ class TelegramBot:
     def _process_message(self, update):
 
         msg = update['message']
+        exclude = []
 
         if 'text' not in msg \
         or 'from' not in msg:
@@ -213,16 +223,18 @@ class TelegramBot:
         # Both these expect a user response
         elif re.fullmatch(r'/admin(@\w+)?', text):
             resp = self._ask_for_secret(msg)
+            exclude.append('admin')
 
         elif re.fullmatch(r'/broadcast(@\w+)?', text):
             self._expect_broadcast(msg)
+            exclude.append('broadcast')
 
         else:
+            self._check_admin_secret(msg)
             self._check_broadcast_reply(msg)
-        
-        # parsed = resp.json()
-        # print(json.dumps(parsed, indent=2))
 
+        self._reset_state(msg['chat']['id'], exclude)
+        
     def _process_callback_query(self, update):
 
         query = update['callback_query']
@@ -242,51 +254,99 @@ class TelegramBot:
         self.answer_callback_query(reply)
         # self.send_message(reply)
 
+    def _reset_state(self, chat_id, exclude=[]):
+
+        if 'admin' not in exclude:
+            self._peasants.pop(chat_id, None)
+
+        if 'broadcast' not in exclude:
+            self._broadcasters.pop(chat_id, None)
+        
     def _check_broadcast_reply(self, msg):
 
         chat = msg['chat']['id']
         user = msg['from']['id']
+        text = msg['text']
 
-        if chat not in self.expected:
+        if chat not in self._broadcasters:
             return
         
-        if user != self.expected[chat]:
+        if user != self._broadcasters[chat]:
             return
 
-        # Validate if user is admin
-        reply = { 'text': msg['text'] }
-        self.broadcast(reply)
+        del self._broadcasters[chat]
+        self.broadcast({ 'text': text })
 
-        del self.expected[chat]
+    def _check_admin_secret(self, msg):
+
+        chat = msg['chat']['id']
+        user = msg['from']['id']
+
+        if chat not in self._peasants:
+            return
+        
+        if user != self._peasants[chat]:
+            return
+
+        if msg['text'] == 'Yes':
+            self.add_admin(user)
+            reply = 'Now you are part of Jesus'
+        else:
+            reply = 'You are not ready'
+
+        del self._peasants[chat]
+        self.send_message({
+            'chat_id': chat,
+            'text': reply
+        })
 
     def _expect_broadcast(self, msg):
 
         user = msg['from']['id']
         chat = msg['chat']['id']
 
-        self.expected[user] = chat
+        # Validate if user is admin
+        if str(user) in self.admins:
+            self._broadcasters[chat] = user
+            reply = 'What would you like to say to everyone?' 
+        else:
+            reply = "I can't let you do that"
+
         self.send_message({ 
             'chat_id': chat, 
-            'text': 'What would you like to say to everyone?' 
+            'text': reply
         })
 
     def _ask_for_secret(self, msg):
-        print(json.dumps(msg, indent=2))
+
+        user = msg['from']['id']
+        chat = msg['chat']['id']
+
+        if str(user) in self.admins:
+            reply = 'You are already a superior being.'
+        else:
+            reply = 'Do you have what is needed?'
+            self._peasants[chat] = user
+
+        self.send_message({
+            'chat_id': chat,
+            'text': reply
+        })
 
     def _ask_for_nudes(self, msg):
 
-        reply = {}
-        reply['chat_id'] = msg['chat']['id'] 
-        reply['text'] = 'Would you like to receive news about Jesus?' 
-        reply['reply_markup'] = json.dumps({ 
-            'inline_keyboard': [[
-                { 'text': 'Yep' , 'callback_data': 'True' }, 
-                { 'text': 'Nope', 'callback_data': 'False' }
-            ]]
+        chat_id = msg['chat']['id']
+        question = 'Would you like to receive news about Jesus?'
+
+        accept = { 'text': 'Yep' , 'callback_data': 'True'  }
+        cancel = { 'text': 'Nope', 'callback_data': 'False' }
+        markup = { 'inline_keyboard': [[ accept, cancel ]] }
+
+        return self.send_message({
+            'chat_id': chat_id,
+            'text': question,
+            'reply_markup': json.dumps(markup)
         })
-
-
-        return self.send_message(reply)
 
     def _reply_market_info(self, msg):
         
@@ -326,6 +386,7 @@ def bot_factory():
 
     token = utils.input_token()
     chats = utils.read_stored_chats()
+    # Read admins from somewhere
     bot = TelegramBot(token, chats)
     return bot
 
