@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import requests as rq
+import time
 
 # Coin market cap
 API_URL = 'https://api.coinmarketcap.com/v1/{}/'
@@ -11,6 +12,7 @@ def request_global_market():
 
     url = API_URL.format('global')
     res = rq.get(url, timeout=3)
+
     return res
 
 def request_coin(ticker=None):
@@ -23,68 +25,18 @@ def request_coin(ticker=None):
     res = rq.get(url, timeout=3)
     return res
 
-def get_global_market():
-
-    market = None
-    resp = request_global_market()
-    print(resp.text)
-
-    if resp.status_code == 200:
-        market = resp.json()
-
-    return market
-
-def get_bitcoin_info():
-
-    info = None
-    resp = request_coin('bitcoin')
-    print(resp.text)
-
-    if resp.status_code == 200:
-
-        coins = resp.json()
-
-        if not coins:
-            return None
-
-        info = coins[0]
-
-        # Add change data
-        current_market_cap = float(info['market_cap_usd'])
-        percent_change = float(info['percent_change_24h'])
-
-        old_market_cap = current_market_cap / (percent_change/100 + 1)
-        info['change_24h'] = current_market_cap - old_market_cap
-    
-    return info
-
-def changes_text(market):
-
-    total = market.calculate_change()
-    coin = get_bitcoin_info()
-
-    diff = total['market_cap_change']
-    percent_change = market['percent_change_24h']
-
-    news  = 'Total Market Cap:\n'
-    news += 'Change: {:+.2f}\n'.format(diff)
-    news += '24h Change: {:+.2f}%'.format(percent_change)
-
-    diff = coin['change_24h']
-    percent_change = coin['percent_change_24h']
-    
-    news += 'Bitcoin Market Cap:\n'
-    news += 'Change: {:+.2f}\n'.format(diff)
-    news += '24h Change: {:+.2f}%'.format(percent_change)
-    
-    return news
-
-class MarketChange:
+class MarketInfo:
 
     def __init__(self):
 
         self.reference = None
         self.current = None
+        
+        self._market = None
+        self._coin = None
+
+        self._market_timestamp = 0
+        self._coin_timestamp = 0
 
     # Returns True if it detects a major change
     def compare_market(self):
@@ -124,10 +76,60 @@ class MarketChange:
             'percent_change_24h': percent_change
         }
 
+    def get_global_market(self):
+
+        market = None
+        now = time.time()
+
+        if now - self._market_timestamp < 30:
+            print('Returned cached Market info')
+            return self._market
+
+        resp = request_global_market()
+        #print(resp.text)
+
+        if resp.status_code == 200:
+            market = resp.json()
+            self._market = market
+
+        self._market_timestamp = time.time()
+        return market
+
+    def get_bitcoin_info(self):
+
+        info = None
+        coins = []
+        now = time.time()
+
+        if now - self._coin_timestamp < 30:
+            print('Returned cached Bitcoin info')
+            return self._coin
+
+        resp = request_coin('bitcoin')
+        #print(resp.text)
+
+        if resp.status_code == 200:
+            coins = resp.json()
+
+        if coins:
+            # Add change info
+            info = coins[0]
+            current_market_cap = float(info['market_cap_usd'])
+            percent_change = float(info['percent_change_24h'])
+
+            percent_change = percent_change / 100 + 1
+            old_market_cap = current_market_cap / percent_change
+            info['change_24h'] = current_market_cap - old_market_cap
+
+            self._coin = info
+
+        self._coin_timestamp = time.time()
+        return info
+
     def changes_text(self):
 
         total = self.calculate_change()
-        coin = get_bitcoin_info()
+        coin = self.get_bitcoin_info()
 
         diff = total['market_cap_change']
         percent_change = total['percent_change_24h']
@@ -138,12 +140,11 @@ class MarketChange:
 
         diff = coin['change_24h']
         percent_change = coin['percent_change_24h']
-        
+
         news += '\n\n'
         news += 'Bitcoin Market Cap:\n'
         news += 'Change: {:+.2f}\n'.format(float(diff))
         news += '24h Change: {:+.2f}%'.format(float(percent_change))
         
         return news
-
 

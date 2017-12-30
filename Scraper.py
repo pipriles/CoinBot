@@ -6,7 +6,7 @@ import Market as mkt
 
 class MarketScraper(threading.Thread):
 
-    def __init__(self, bot, timeout=30):
+    def __init__(self, bot, timeout=300):
 
         threading.Thread.__init__(self)
 
@@ -24,7 +24,7 @@ class MarketScraper(threading.Thread):
 
             except Exception as e:
                 print(e)
-                self.event.wait(60)
+                self.event.wait(600)
 
             # This is not needed...
             except KeyboardInterrupt:
@@ -32,7 +32,7 @@ class MarketScraper(threading.Thread):
 
 def fetch_market_changes(bot):
 
-    bot.market.current = mkt.get_global_market()
+    bot.market.current = bot.market.get_global_market()
 
     if bot.market.current is None:
         raise Exception('The current global market was None')

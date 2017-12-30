@@ -37,7 +37,7 @@ class TelegramBot:
 
         # Should be moved to other site
         if market is None:
-            self.market = mkt.MarketChange()
+            self.market = mkt.MarketInfo()
 
         self._broadcasters = {}
         self._peasants = {}
@@ -352,11 +352,8 @@ class TelegramBot:
     def _reply_market_info(self, msg):
         
         try:
-            market = mkt.get_global_market()
-            coin = mkt.get_bitcoin_info()
-
-            print(json.dumps(market, indent=2))
-            print(json.dumps(coin, indent=2))
+            market = self.market.get_global_market()
+            coin = self.market.get_bitcoin_info()
 
             text  = 'BitCoin Price: ${:.2f}\n'
             text += 'Total Market Cap:\n${:.2f}...'
