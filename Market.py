@@ -106,11 +106,16 @@ class MarketChange:
 
     def calculate_change(self):
 
-        old_cap = float(self.reference[MARKET_CAP])
-        new_cap = float(self.current[MARKET_CAP])
+        diff = 0
+        percent_change = 0
 
-        diff = new_cap - old_cap
-        percent_change = diff / old_cap * 100
+        if self.reference and self.current:
+
+            old_cap = float(self.reference[MARKET_CAP])
+            new_cap = float(self.current[MARKET_CAP])
+
+            diff = new_cap - old_cap
+            percent_change = diff / old_cap * 100
 
         return {
             'market_cap_change': diff,

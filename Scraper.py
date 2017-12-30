@@ -16,24 +16,15 @@ class MarketScraper(threading.Thread):
 
     def run(self):
 
-        attempt = 1
-        delay = 60
-
         while not self.event.is_set():
 
             try:
                 fetch_market_changes(self.bot)
                 self.event.wait(self.timeout)
-                delay = 60
 
             except Exception as e:
                 print(e)
-                if attempt > 3:
-                    break
-
-                self.event.wait(delay)
-                attempt += 1
-                delay *= 2
+                self.event.wait(60)
 
             # This is not needed...
             except KeyboardInterrupt:

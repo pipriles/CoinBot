@@ -355,6 +355,9 @@ class TelegramBot:
             market = mkt.get_global_market()
             coin = mkt.get_bitcoin_info()
 
+            print(json.dumps(market, indent=2))
+            print(json.dumps(coin, indent=2))
+
             text  = 'BitCoin Price: ${:.2f}\n'
             text += 'Total Market Cap:\n${:.2f}...'
 
@@ -380,7 +383,8 @@ class TelegramBot:
         try:
             reply['text'] = self.market.changes_text()
 
-        except Exception:
+        except Exception as e:
+            print(e)
             reply['text'] = 'Try again later...'
 
         self.send_message(reply)
