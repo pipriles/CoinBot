@@ -52,30 +52,10 @@ def fetch_market_changes(bot):
     result = bot.market.compare_market()
 
     if result:
+
         print('News About Jesus!', bot.chats)
-        news = changes_text(bot.market)
+        news = bot.market.changes_text()
         bot.broadcast({ 'text': news })
 
         bot.market.reference = bot.market.current
-
-def changes_text(market):
-
-    total = market.calculate_change()
-    coin = mkt.get_bitcoin_info()
-
-    diff = total['market_cap_change']
-    percent_change = market['percent_change_24h']
-
-    news  = 'Total Market Cap:\n'
-    news += 'Change: {:+.2f}\n'.format(diff)
-    news += '24h Change: {:+.2f}%'.format(percent_change)
-
-    diff = coin['change_24h']
-    percent_change = coin['percent_change_24h']
-    
-    news += 'Bitcoin Market Cap:\n'
-    news += 'Change: {:+.2f}\n'.format(diff)
-    news += '24h Change: {:+.2f}%'.format(percent_change)
-    
-    return news
 

@@ -51,10 +51,31 @@ def get_bitcoin_info():
         current_market_cap = float(info['market_cap_usd'])
         percent_change = float(info['percent_change_24h'])
 
-        old_market_cap = current_market_cap / (percent_change + 1)
+        old_market_cap = current_market_cap / (percent_change/100 + 1)
         info['change_24h'] = current_market_cap - old_market_cap
     
     return info
+
+def changes_text(market):
+
+    total = market.calculate_change()
+    coin = get_bitcoin_info()
+
+    diff = total['market_cap_change']
+    percent_change = market['percent_change_24h']
+
+    news  = 'Total Market Cap:\n'
+    news += 'Change: {:+.2f}\n'.format(diff)
+    news += '24h Change: {:+.2f}%'.format(percent_change)
+
+    diff = coin['change_24h']
+    percent_change = coin['percent_change_24h']
+    
+    news += 'Bitcoin Market Cap:\n'
+    news += 'Change: {:+.2f}\n'.format(diff)
+    news += '24h Change: {:+.2f}%'.format(percent_change)
+    
+    return news
 
 class MarketChange:
 
@@ -69,11 +90,10 @@ class MarketChange:
         if self.reference is None:
             return False
 
-        old_cap = float(self.reference[MARKET_CAP])
-        new_cap = float(self.current[MARKET_CAP])
+        change = self.calculate_change()
 
-        diff = new_cap - old_cap
-        percent_change = diff / old_cap
+        diff = change['market_cap_change']
+        percent_change = change['percent_change_24h']
 
         print('Changed: {:+.2f}'.format(diff))
         print('24h change: {:+.2f}'.format(percent_change))
@@ -90,10 +110,33 @@ class MarketChange:
         new_cap = float(self.current[MARKET_CAP])
 
         diff = new_cap - old_cap
-        percent_change = diff / old_cap
+        percent_change = diff / old_cap * 100
 
         return {
             'market_cap_change': diff,
             'percent_change_24h': percent_change
         }
+
+    def changes_text(self):
+
+        total = self.calculate_change()
+        coin = get_bitcoin_info()
+
+        diff = total['market_cap_change']
+        percent_change = total['percent_change_24h']
+
+        news  = 'Total Market Cap:\n'
+        news += 'Change: {:+.2f}\n'.format(float(diff))
+        news += '24h Change: {:+.2f}%'.format(float(percent_change))
+
+        diff = coin['change_24h']
+        percent_change = coin['percent_change_24h']
+        
+        news += '\n\n'
+        news += 'Bitcoin Market Cap:\n'
+        news += 'Change: {:+.2f}\n'.format(float(diff))
+        news += '24h Change: {:+.2f}%'.format(float(percent_change))
+        
+        return news
+
 

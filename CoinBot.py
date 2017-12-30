@@ -226,6 +226,9 @@ class TelegramBot:
             self._expect_broadcast(msg)
             exclude.append('broadcast')
 
+        elif re.fullmatch(r'/change(@\w+)?', text):
+            self._reply_last_changes(msg)
+
         else:
             self._check_admin_secret(msg)
             self._check_broadcast_reply(msg)
@@ -368,6 +371,18 @@ class TelegramBot:
         reply['text'] = text
 
         return self.send_message(reply)
+
+    def _reply_last_changes(self, msg):
+
+        reply = { 'chat_id': msg['chat']['id'] }
+
+        try:
+            reply['text'] = self.market.changes_text()
+
+        except Exception:
+            reply['text'] = 'Try again later...'
+
+        self.send_message(reply)
 
     def _tell_bad_joke(self, msg):
 
