@@ -27,6 +27,7 @@ def get_global_market():
 
     market = None
     resp = request_global_market()
+    print(resp.text)
 
     if resp.status_code == 200:
         market = resp.json()
@@ -37,6 +38,7 @@ def get_bitcoin_info():
 
     info = None
     resp = request_coin('bitcoin')
+    print(resp.text)
 
     if resp.status_code == 200:
 
