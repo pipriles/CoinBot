@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.6
 import requests as rq
 import time
 
@@ -135,7 +135,7 @@ class MarketInfo:
         percent_change = total['percent_change_24h']
 
         news  = 'Total Market Cap:\n'
-        news += 'Change: {:+.2f}\n'.format(float(diff))
+        news += 'Change: {:+,.2f}\n'.format(float(diff))
         news += '24h Change: {:+.2f}%'.format(float(percent_change))
 
         diff = coin['change_24h']
@@ -143,7 +143,7 @@ class MarketInfo:
 
         news += '\n\n'
         news += 'Bitcoin Market Cap:\n'
-        news += 'Change: {:+.2f}\n'.format(float(diff))
+        news += 'Change: {:+,.2f}\n'.format(float(diff))
         news += '24h Change: {:+.2f}%'.format(float(percent_change))
         
         return news
