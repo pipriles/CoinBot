@@ -46,7 +46,10 @@ def fetch_market_changes(bot):
 
         print('News About Jesus!', bot.chats)
         news = bot.market.changes_text()
-        bot.broadcast({ 'text': news })
+        bot.broadcast({ 
+            'text': news,
+            'parse_mode': 'markdown'
+        })
 
         bot.market.reference = bot.market.current
 
