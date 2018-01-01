@@ -226,8 +226,8 @@ class TelegramBot:
             self._expect_broadcast(msg)
             exclude.append('broadcast')
 
-        elif re.fullmatch(r'/change(@\w+)?', text):
-            self._reply_last_changes(msg)
+        # elif re.fullmatch(r'/change(@\w+)?', text):
+        #     self._reply_last_changes(msg)
 
         else:
             self._check_admin_secret(msg)
@@ -355,13 +355,20 @@ class TelegramBot:
             market = self.market.get_global_market()
             coin = self.market.get_bitcoin_info()
 
-            text  = 'BitCoin Price: ${:.2f}\n'
-            text += 'Total Market Cap:\n${:.2f}...'
+            text  = ''
+            # text += 'BitCoin Price: ${:,.2f}\n'
+            text += '*Total Market Cap:*\n${:,.2f}\n'
+            text += '*Bitcoin Market Cap:*\n${:,.2f}\n\n'
+            text += '*Changes:*\n'
+            text += '--------------------\n'
 
             text = text.format(
-                float(coin['price_usd']), 
-                float(market['total_market_cap_usd'])
+                # float(coin['price_usd']), 
+                float(market['total_market_cap_usd']),
+                float(coin['market_cap_usd'])
             )
+
+            text += self.market.changes_text()
 
         except Exception as e:
             print(e)
@@ -369,6 +376,7 @@ class TelegramBot:
 
         reply = {}
         reply['chat_id'] = msg['chat']['id']
+        reply['parse_mode'] = 'Markdown'
         reply['text'] = text
 
         return self.send_message(reply)

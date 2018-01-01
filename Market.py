@@ -135,8 +135,8 @@ class MarketInfo:
         percent_change = total['percent_change_24h']
         money = "+$" if diff > 0 else "-$"
 
-        news  = 'Total Market Cap:\n'
-        news += 'Change: {}{:,.2f}\n'.format(money, float(diff))
+        news  = '*Total Market Cap:*\n'
+        news += 'Change: {}{:,.2f}\n'.format(money, abs(float(diff)))
         news += '24h Change: {:+.2f}%'.format(float(percent_change))
 
         diff = coin['change_24h']
@@ -144,8 +144,8 @@ class MarketInfo:
         money = "+$" if diff > 0 else "-$"
 
         news += '\n\n'
-        news += 'Bitcoin Market Cap:\n'
-        news += 'Change: {}{:,.2f}\n'.format(money, float(diff))
+        news += '*Bitcoin Market Cap:*\n'
+        news += 'Change: {}{:,.2f}\n'.format(money, abs(float(diff)))
         news += '24h Change: {:+.2f}%'.format(float(percent_change))
         
         return news
