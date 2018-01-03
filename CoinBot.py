@@ -245,11 +245,11 @@ class TelegramBot:
 
         if query['data'] == 'True':
             self.store_chat(chat_id)
-            reply['text'] = 'Now you will receive news about Jesus.' 
+            reply['text'] = 'Now you will receive automated updates.'
             
         else:
             self.forget_chat(chat_id)
-            reply['text'] = 'Now Jesus will forget you.'
+            reply['text'] = 'You will not receive more updates.'
 
         self.answer_callback_query(reply)
         # self.send_message(reply)
@@ -289,17 +289,14 @@ class TelegramBot:
             return
 
         # Validate if it is not str
-        if msg['text'].lower() == 'yes':
+        if msg['text'].lower() == 'yes i do boss':
             self.add_admin(user)
-            reply = 'Now you are part of Jesus'
+            reply = 'Now you are a superior being'
         else:
             reply = 'You are not ready'
 
         del self._peasants[chat]
-        self.send_message({
-            'chat_id': chat,
-            'text': reply
-        })
+        self.send_message({ 'chat_id': chat, 'text': reply })
 
     def _expect_broadcast(self, msg):
 
@@ -313,10 +310,7 @@ class TelegramBot:
         else:
             reply = "I can't let you do that"
 
-        self.send_message({ 
-            'chat_id': chat, 
-            'text': reply
-        })
+        self.send_message({ 'chat_id': chat, 'text': reply })
 
     def _ask_for_secret(self, msg):
 
@@ -329,18 +323,16 @@ class TelegramBot:
             reply = 'Do you have what is needed?'
             self._peasants[chat] = user
 
-        self.send_message({
-            'chat_id': chat,
-            'text': reply
-        })
+        self.send_message({ 'chat_id': chat, 'text': reply })
 
     def _ask_for_nudes(self, msg):
 
         chat_id = msg['chat']['id']
-        question = 'Would you like to receive news about Jesus?'
+        question  = 'Would you like to receive automated updates'
+        question += ' when the cryptocurrency market cap changes?'
 
-        accept = { 'text': 'Yep' , 'callback_data': 'True'  }
-        cancel = { 'text': 'Nope', 'callback_data': 'False' }
+        accept = { 'text': 'Yes', 'callback_data': 'True'  }
+        cancel = { 'text': 'No' , 'callback_data': 'False' }
         markup = { 'inline_keyboard': [[ accept, cancel ]] }
 
         return self.send_message({
@@ -352,24 +344,7 @@ class TelegramBot:
     def _reply_market_info(self, msg):
         
         try:
-            market = self.market.get_global_market()
-            coin = self.market.get_bitcoin_info()
-
-            text  = ''
-            # text += 'BitCoin Price: ${:,.2f}\n'
-            text += '*Total Market Cap:*\n${:,.2f}\n'
-            text += '*Bitcoin Market Cap:*\n${:,.2f}\n\n'
-            text += '*Changes:*\n'
-            text += '--------------------\n'
-
-            text = text.format(
-                # float(coin['price_usd']), 
-                float(market['total_market_cap_usd']),
-                float(coin['market_cap_usd'])
-            )
-
-            text += self.market.changes_text()
-
+            text = self.market.changes_text()
         except Exception as e:
             print(e)
             text = 'Ups... There was an error.'

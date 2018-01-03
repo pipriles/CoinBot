@@ -52,7 +52,7 @@ class MarketInfo:
         print('Changed: {:+.2f}'.format(diff))
         print('24h change: {:+.2f}'.format(percent_change))
 
-        if abs(diff) > 1000000000:
+        if abs(diff) > 10000000000:
             print('changed by 10b!')
             return True
 
@@ -128,23 +128,30 @@ class MarketInfo:
 
     def changes_text(self):
 
-        total = self.calculate_change()
+        market = self.get_global_market()
+        change = self.calculate_change()
         coin = self.get_bitcoin_info()
 
-        diff = total['market_cap_change']
-        percent_change = total['percent_change_24h']
+        cap = market['total_market_cap_usd']
+        diff = change['market_cap_change']
+        percent_change = change['percent_change_24h']
         money = "+$" if diff > 0 else "-$"
 
         news  = '*Total Market Cap:*\n'
+        news += '${:,.2f}\n'.format(float(cap))
+        news += '--------------------\n'
         news += 'Change: {}{:,.2f}\n'.format(money, abs(float(diff)))
         news += '24h Change: {:+.2f}%'.format(float(percent_change))
 
+        cap = coin['market_cap_usd']
         diff = coin['change_24h']
         percent_change = coin['percent_change_24h']
         money = "+$" if diff > 0 else "-$"
 
         news += '\n\n'
         news += '*Bitcoin Market Cap:*\n'
+        news += '${:,.2f}\n'.format(float(cap))
+        news += '--------------------\n'
         news += 'Change: {}{:,.2f}\n'.format(money, abs(float(diff)))
         news += '24h Change: {:+.2f}%'.format(float(percent_change))
         
