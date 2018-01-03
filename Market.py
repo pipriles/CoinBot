@@ -81,7 +81,7 @@ class MarketInfo:
         market = None
         now = time.time()
 
-        if now - self._market_timestamp < 30:
+        if now - self._market_timestamp < 150:
             print('Returned cached Market info')
             return self._market
 
@@ -101,7 +101,7 @@ class MarketInfo:
         coins = []
         now = time.time()
 
-        if now - self._coin_timestamp < 30:
+        if now - self._coin_timestamp < 150:
             print('Returned cached Bitcoin info')
             return self._coin
 
