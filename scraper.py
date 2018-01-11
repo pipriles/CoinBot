@@ -2,7 +2,7 @@
 import threading
 import json
 
-import Market as mkt
+import market as mkt
 
 class MarketScraper(threading.Thread):
 
@@ -29,6 +29,12 @@ class MarketScraper(threading.Thread):
             # This is not needed...
             except KeyboardInterrupt:
                 break
+
+    def stop(self):
+        # End thread
+        self.event.set()
+        self.join()
+
 
 def fetch_market_changes(bot):
 

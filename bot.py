@@ -4,13 +4,14 @@ import requests as rq
 import time
 import json
 import re
+import os
 
 import threading
 import queue
 
-import Scraper as sp
-import Market as mkt
-import Utils as utils
+import utils 
+import scraper as sp
+import market as mkt
 
 API_URL = 'https://api.telegram.org/bot{}/{}'
 JOKE_API = 'https://icanhazdadjoke.com/'
@@ -22,13 +23,14 @@ JOKE_API = 'https://icanhazdadjoke.com/'
 # populate the market data which would be given by 
 # the telegram bot.
 
+# Read admins from somewhere
+# Change _subscribed to chats
+
 class TelegramBot:
 
-    def __init__(self, token, 
-            chats=None, admins=None, market=None):
+    def __init__(self, token, admins=None, market=None):
 
         self.token = token
-        self.chats = set() if chats is None else set(chats)
         self.admins = set() if admins is None else set(admins)
 
         self.offset  = 0
@@ -41,6 +43,7 @@ class TelegramBot:
 
         self._broadcasters = {}
         self._peasants = {}
+        self._subscribed = {}
 
         # Threading
         # Uncomment for multithreading
@@ -137,15 +140,18 @@ class TelegramBot:
         res = rq.post(url, data=args)
         return res
 
-    def store_chat(self, chat_id):
+    def store_chat(self, chat):
 
-        chat = str(chat_id)
-        self.chats.add(chat)
+        _id = chat.get('id')
+        self._subscribed[_id] = chat
 
-    def forget_chat(self, chat_id):
+    def forget_chat(self, chat):
 
-        chat = str(chat_id)
-        self.chats.discard(chat)
+        try:
+            _id = chat.get('id')
+            del self._subscribed[_id]
+        except KeyError:
+            pass
 
     def add_admin(self, user_id):
 
@@ -154,10 +160,16 @@ class TelegramBot:
 
     def broadcast(self, message):
 
-        for chat in self.chats:
+        for chat in self._subscribed:
             result = { 'chat_id': chat }
             result.update(message)
             self.send_message(result)
+
+    def get_chat(self, chat_id):
+
+        url = API_URL.format(self.token, 'getChat')
+        res = rq.post(url, data={ 'chat_id': chat_id })
+        return res
 
     ##############################
     # Just for multithreading    #
@@ -226,9 +238,12 @@ class TelegramBot:
             self._expect_broadcast(msg)
             exclude.append('broadcast')
 
+        elif re.fullmatch(r'/users(@\w+)?', text):
+            self._users_subscribed(msg)
+
         # elif re.fullmatch(r'/change(@\w+)?', text):
         #     self._reply_last_changes(msg)
-
+        
         else:
             self._check_admin_secret(msg)
             self._check_broadcast_reply(msg)
@@ -241,14 +256,14 @@ class TelegramBot:
         message = query['message']
 
         reply = { 'callback_query_id': query['id'] }
-        chat_id = message['chat']['id']
+        chat = message.get('chat')
 
         if query['data'] == 'True':
-            self.store_chat(chat_id)
+            self.store_chat(chat)
             reply['text'] = 'Now you will receive automated updates.'
             
         else:
-            self.forget_chat(chat_id)
+            self.forget_chat(chat)
             reply['text'] = 'You will not receive more updates.'
 
         self.answer_callback_query(reply)
@@ -297,6 +312,42 @@ class TelegramBot:
 
         del self._peasants[chat]
         self.send_message({ 'chat_id': chat, 'text': reply })
+
+    def _users_subscribed(self, msg):
+
+        user = msg['from']['id']
+        chat = msg['chat']['id']
+
+        if str(user) in self.admins:
+            reply  = '*User subscribed:*\n'
+            reply += '-------------------\n'
+            users = []
+            for k, v in self._subscribed.items():
+                if v.get('type') == 'private':
+                    info  = '*{id}:* \n'
+                    info += ' Type: {type} \n'
+                    info += ' User: {username} \n'
+                    info += ' Name: {first_name} {last_name}'
+                    info = info.format(**v)
+                else:
+                    info  = '*{id}:* \n'
+                    info += ' Type: {type} \n'
+                    info += ' Title: {title}'
+                    info = info.format(**v)
+
+                users.append(info)
+
+            reply += '\n'.join(users)
+            utils.export_chats(self._subscribed)
+            
+        else:
+            reply = "You are not my master"
+
+        self.send_message({ 
+            'chat_id': chat, 
+            'text': reply,
+            'parse_mode': 'markdown'
+        })
 
     def _expect_broadcast(self, msg):
 
@@ -385,12 +436,22 @@ class TelegramBot:
 
         return self.send_message(reply)
 
+    def export_chats(self):
+        utils.export_chats(self._subscribed)
+
+    def restore_chats(self):
+        self._subscribed = utils.import_chats()
+
 def bot_factory():
 
-    token = utils.input_token()
-    chats = utils.read_stored_chats()
-    # Read admins from somewhere
-    bot = TelegramBot(token, chats)
+    token = os.environ.get('TOKEN')
+
+    if token is None:
+        raise Exception('You have to provide a token')
+
+    bot = TelegramBot(token)
+    bot.restore_chats()
+
     return bot
 
 def main():
@@ -411,11 +472,8 @@ def main():
         pass
 
     finally:
-        utils.write_stored_chats(bot.chats)
-        if scraper:
-            # End thread
-            scraper.event.set()
-            scraper.join()
+        if bot: bot.export_chats()
+        if scraper: scraper.stop()
 
 if __name__ == '__main__':
     main()

@@ -1,6 +1,9 @@
 # Token for scraper
 token.txt
 chats.txt
+chats.csv
+
+*.swp
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
