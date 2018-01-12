@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.6
+#!/usr/bin/env python3
 
 import requests as rq
 import time
@@ -142,13 +142,16 @@ class TelegramBot:
 
     def store_chat(self, chat):
 
-        _id = chat.get('id')
+        # Add timestamp to chat
+        chat['timestamp'] = int(time.time())
+
+        _id = str(chat.get('id'))
         self._subscribed[_id] = chat
 
     def forget_chat(self, chat):
 
         try:
-            _id = chat.get('id')
+            _id = str(chat.get('id'))
             del self._subscribed[_id]
         except KeyError:
             pass
@@ -318,30 +321,11 @@ class TelegramBot:
         user = msg['from']['id']
         chat = msg['chat']['id']
 
-        if str(user) in self.admins:
-            reply  = '*User subscribed:*\n'
-            reply += '-------------------\n'
-            users = []
-            for k, v in self._subscribed.items():
-                if v.get('type') == 'private':
-                    info  = '*{id}:* \n'
-                    info += ' Type: {type} \n'
-                    info += ' User: {username} \n'
-                    info += ' Name: {first_name} {last_name}'
-                    info = info.format(**v)
-                else:
-                    info  = '*{id}:* \n'
-                    info += ' Type: {type} \n'
-                    info += ' Title: {title}'
-                    info = info.format(**v)
+        count = len(self._subscribed)
+        reply = 'User subscribed: *{}*'
+        reply = reply.format(count)
 
-                users.append(info)
-
-            reply += '\n'.join(users)
-            utils.export_chats(self._subscribed)
-            
-        else:
-            reply = "You are not my master"
+        utils.export_chats(self._subscribed)
 
         self.send_message({ 
             'chat_id': chat, 
@@ -395,7 +379,7 @@ class TelegramBot:
     def _reply_market_info(self, msg):
         
         try:
-            text = self.market.changes_text()
+            text = self.market.status_text()
         except Exception as e:
             print(e)
             text = 'Ups... There was an error.'

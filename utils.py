@@ -2,35 +2,13 @@
 import os
 import csv
 
-CHATS_PATH = 'chats.txt'
-CHATS_CSV = 'chats.csv'
-
-def read_stored_chats():
-
-    if not os.path.exists(CHATS_PATH):
-        write_stored_chats([])
-
-    with open(CHATS_PATH, 'r') as f:
-        chats = f.read().splitlines()
-
-    return chats
-
-def write_stored_chats(chats):
-
-    with open(CHATS_PATH, 'w') as f:
-        f.write("\n".join(chats))
-
-def input_token():
-    # Enter some token from input
-    token = input()
-    print('Token entered:', token)
-    return token
+CHATS_PATH = 'chats.csv'
 
 def export_chats(chats: dict):
 
-    with open('chats.csv', 'w') as f:
+    with open(CHATS_PATH, 'w') as f:
         fields = ['id', 'type', 'title', 'first_name', 
-                  'last_name', 'username' ]
+                  'last_name', 'username', 'timestamp']
         writer = csv.DictWriter(f, fieldnames=fields, 
                 extrasaction='ignore')
 
@@ -39,13 +17,13 @@ def export_chats(chats: dict):
 
 def import_chats():
 
-    if not os.path.exists(CHATS_CSV):
+    if not os.path.exists(CHATS_PATH):
         return {}
 
     chats = {}
     with open('chats.csv', 'r') as f:
         fields = ['id', 'type', 'title', 'first_name', 
-                  'last_name', 'username']
+                  'last_name', 'username', 'timestamp']
         reader = csv.DictReader(f, fieldnames=fields)
         chats = { row['id']: row for row in reader }
 

@@ -5,6 +5,7 @@ import time
 # Coin market cap
 API_URL = 'https://api.coinmarketcap.com/v1/{}/'
 MARKET_CAP = 'total_market_cap_usd'
+BITCOIN_PART = 'bitcoin_percentage_of_market_cap'
 
 # API_URL = 'http://coincap.io/global'
 
@@ -68,12 +69,27 @@ class MarketInfo:
             old_cap = float(self.reference[MARKET_CAP])
             new_cap = float(self.current[MARKET_CAP])
 
-            diff = new_cap - old_cap
-            percent_change = diff / old_cap * 100
+            old_part = float(self.reference[BITCOIN_PART]) / 100
+            new_part = float(self.current[BITCOIN_PART]) / 100
+
+            total_diff = new_cap - old_cap
+            percent_change = total_diff / old_cap * 100
+
+            old_bit = old_cap * old_part
+            new_bit = new_cap * new_part
+            bit_cap_diff = new_bit - old_bit
+
+            old_exclude = old_cap - old_bit
+            new_exclude = new_cap - new_bit
+            exclude_bit_diff = new_exclude - old_exclude
 
         return {
-            'market_cap_change': diff,
-            'percent_change_24h': percent_change
+            'market_cap_change': total_diff,
+            'market_cap_change_no_bitcoin': exclude_bit_diff,
+            'market_cap_change_bitcoin': bit_cap_diff,
+            'percent_change_24h': percent_change,
+            'bitcoin_market_cap': new_bit,
+            'market_cap_no_bitcoin': new_exclude
         }
 
     def get_global_market(self):
@@ -130,30 +146,88 @@ class MarketInfo:
 
         market = self.get_global_market()
         change = self.calculate_change()
-        coin = self.get_bitcoin_info()
+    
+        news  = '*Automated Market Cap Alert:*\n'
+        news += '------------------------------\n'
 
         cap = market['total_market_cap_usd']
         diff = change['market_cap_change']
-        percent_change = change['percent_change_24h']
-        money = "+$" if diff > 0 else "-$"
+        sign = "+$" if diff > 0 else "-$"
 
-        news  = '*Total Market Cap:*\n'
+        news += '*Total Market Cap (Incl. Bitcoin):*\n'
         news += '${:,.2f}\n'.format(float(cap))
-        news += '--------------------\n'
-        news += 'Change: {}{:,.2f}\n'.format(money, abs(float(diff)))
-        news += '24h Change: {:+.2f}%'.format(float(percent_change))
+        news += '*Change from our last automated alert:*\n'
+        news += '{}{:,.2f}\n'.format(sign, abs(float(diff)))
+        news += '------------------------------\n'
 
-        cap = coin['market_cap_usd']
-        diff = coin['change_24h']
-        percent_change = coin['percent_change_24h']
-        money = "+$" if diff > 0 else "-$"
+        cap = change['market_cap_no_bitcoin']
+        diff = change['market_cap_change_no_bitcoin']
+        sign = "+$" if diff > 0 else "-$"
 
-        news += '\n\n'
+        news += '*Total Market Cap (Excl. Bitcoin):*\n'
+        news += '${:,.2f}\n'.format(float(cap))
+        news += '*Change from our last automated alert:*\n'
+        news += '{}{:,.2f}\n'.format(sign, abs(float(diff)))
+        news += '------------------------------\n'
+
+        cap = change['bitcoin_market_cap']
+        diff = change['market_cap_change_bitcoin']
+        sign = "+$" if diff > 0 else "-$"
+
         news += '*Bitcoin Market Cap:*\n'
         news += '${:,.2f}\n'.format(float(cap))
-        news += '--------------------\n'
-        news += 'Change: {}{:,.2f}\n'.format(money, abs(float(diff)))
-        news += '24h Change: {:+.2f}%'.format(float(percent_change))
-        
+        news += '*Change from our last automated alert:*\n'
+        news += '{}{:,.2f}\n'.format(sign, abs(float(diff)))
+
+       # cap = market['total_market_cap_usd']
+       # diff = change['market_cap_change']
+       # percent_change = change['percent_change_24h']
+       # money = "+$" if diff > 0 else "-$"
+
+       # news  = '*Total Market Cap:*\n'
+       # news += '${:,.2f}\n'.format(float(cap))
+       # news += '--------------------\n'
+       # news += 'Change: {}{:,.2f}\n'.format(money, abs(float(diff)))
+       # news += '24h Change: {:+.2f}%'.format(float(percent_change))
+
+       # cap = coin['market_cap_usd']
+       # diff = coin['change_24h']
+       # percent_change = coin['percent_change_24h']
+       # money = "+$" if diff > 0 else "-$"
+
+       # news += '\n\n'
+       # news += '*Bitcoin Market Cap:*\n'
+       # news += '${:,.2f}\n'.format(float(cap))
+       # news += '--------------------\n'
+       # news += 'Change: {}{:,.2f}\n'.format(money, abs(float(diff)))
+       # news += '24h Change: {:+.2f}%'.format(float(percent_change))
+
         return news
+
+    def status_text(self):
+
+        market = self.get_global_market()
+        coin = self.get_bitcoin_info()
+
+        total_cap = market['total_market_cap_usd']
+        percent = market['bitcoin_percentage_of_market_cap']
+        bitcoin_cap = total_cap * percent / 100
+        ex_bitcoin = total_cap - bitcoin_cap
+
+        stat  = '*Manual Market Cap Alert:*\n'
+        stat += '------------------------------\n'
+
+        stat += '*Total Market Cap (Incl. Bitcoin):*\n'
+        stat += '${:,.2f}\n'.format(float(total_cap))
+        stat += '------------------------------\n'
+
+        stat += '*Total Market Cap (Excl. Bitcoin):*\n'
+        stat += '${:,.2f}\n'.format(float(ex_bitcoin))
+        stat += '------------------------------\n'
+
+        stat += '*Bitcoin Market Cap:*\n'
+        stat += '${:,.2f}\n'.format(float(bitcoin_cap))
+        stat += '${:,.2f}\n'.format(float(coin['market_cap_usd']))
+
+        return stat
 

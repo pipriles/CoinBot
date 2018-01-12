@@ -50,7 +50,7 @@ def fetch_market_changes(bot):
 
     if result:
 
-        print('News About Jesus!', bot.chats)
+        print('News About Jesus!')
         news = bot.market.changes_text()
         bot.broadcast({ 
             'text': news,
